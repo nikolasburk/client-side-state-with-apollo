@@ -14,18 +14,23 @@ schema {
   query: Query
   mutation: Mutation
 }
+
 type Query {
   queryLog: QueryLog
 }
+
 type QueryLog {
   entry: [QueryLogEntry!]!
 }
+
 type QueryLogEntry {
   name: String
 }
+
 type Mutation {
   appendToLog(name: String!): QueryLog
 }
+
 ```
 
 Thanks to [schema stitching](dev.apollodata.com/tools/graphql-tools/schema-stitching.html), it's possible to merge this schema with the remote schema from your Graphcool service:

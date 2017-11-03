@@ -1,22 +1,14 @@
-# React & Apollo Quickstart
+# Local State with Apollo Client 2.0
 
-* [React](https://facebook.github.io/react/): Frontend framework for building user interfaces
-* [Apollo Client](https://github.com/apollographql/apollo-client): Fully-featured, production ready caching GraphQL client
-* [Graphcool](https://www.graph.cool): Backend development framework based on GraphQL + Serverless
+This example is based on the [**React & Apollo**-Quickstart](https://www.graph.cool/docs/quickstart/frontend/react/apollo-tijghei9go/) example from the Graphcool documentation.
 
-## Example
-
-![](http://imgur.com/3S6fUeI.gif)
-
-## Quickstart
-
-> For more information on how to get started refer to the full "React & Apollo"-[tutorial](https://www.graph.cool/docs/quickstart/frontend/react/apollo-tijghei9go/) or watch the corresponding [video](https://www.youtube.com/watch?v=OoPQl8hcIug).
+## Get started
 
 ### 1. Clone example repository
 
 ```sh
-git clone https://github.com/graphcool-examples/react-graphql.git
-cd react-graphql/quickstart-with-apollo
+git clone git@github.com:nikolasburk/client-side-state-with-apollo.git
+cd client-side-state-with-apollo
 ```
 
 ### 2. Create Graphcool service with the [Graphcool CLI](https://docs-next.graph.cool/reference/graphcool-cli/overview-zboghez5go)
@@ -63,7 +55,7 @@ type Post @model {
 
 ### 4. Deploy the GraphQL server
 
-You're now ready to put your Graphcool service into production! Navigate into the `server` directory and [deploy](https://docs-next.graph.cool/reference/graphcool-cli/commands-aiteerae6l#graphcool-deploy) the service:
+Navigate into the `server` directory and [deploy](https://docs-next.graph.cool/reference/graphcool-cli/commands-aiteerae6l#graphcool-deploy) the service:
 
 ```sh
 cd server
@@ -72,20 +64,19 @@ graphcool deploy
 
 When prompted which cluster you want to deploy to, choose any of the **Shared Clusters** options (`shared-eu-west-1`, `shared-ap-northeast-1` or `shared-us-west-2`).
 
-Save the HTTP endpoint for the `Simple API` from the output, you'll need it in the next step.
+Save the **Service ID** from the output, you'll need it in the next step.
 
-> **Note**: You can now test your GraphQL API inside a GraphQL playground. Simply type the `graphcool playground` command and start sending queries and mutations.
 
 ### 5. Connect the frontend app with your GraphQL API
 
-Paste the `Simple API` endpoint from the previous step to `./src/index.js` as the `uri` argument in the `HttpLink` constructor call:
+Paste the **Service ID** from the previous step to `./src/index.js` replacing the placeholder `__SERVICE_ID__`:
 
 ```js
-// replace `__SIMPLE_API_ENDPOINT__` with the endpoint from the previous step
-const httpLink = new HttpLink({ uri: '__SIMPLE_API_ENDPOINT__' })
+// replace `__SERVICE_ID__` with the service ID from the previous step
+const endpoint = 'https://api.graph.cool/simple/v1/__SERVICE_ID__'
 ```
 
-> **Note**: If you ever lose your endpoint, you can get access to it again with the `graphcool info` command.
+> **Note**: If you ever lose your endpoint or sevice ID, you can get access to it again with the `graphcool info` command.
 
 ### 6. Install dependencies & run locally
 
@@ -95,18 +86,96 @@ yarn install
 yarn start # open http://localhost:3000 in your browser
 ```
 
-## Next steps
 
-* [Documentation](https://docs-next.graph.cool)
-* [Advanced GraphQL features](https://www.graph.cool/docs/tutorials/advanced-features-eath7duf7d/)
-* [Authentication & Permissions](https://www.graph.cool/docs/reference/authorization/overview-iegoo0heez/)
-* [Implementing business logic with serverless functions](https://www.graph.cool/docs/reference/functions/overview-boo6uteemo/)
+## Client-side State: Query Logging
+
+This example implements a simple logging mechanism that tracks all the queries that have been made when the application is running and stores them in `localStorage`. All the code for the implementation can be found in [index.js](./src/index.js).
+
+It's based on the following schema representing the client-side state:
+
+```graphql
+schema {
+  query: Query
+  mutation: Mutation
+}
+type Query {
+  queryLog: QueryLog
+}
+type QueryLog {
+  entry: [QueryLogEntry!]!
+}
+type QueryLogEntry {
+  name: String
+}
+type Mutation {
+  appendToLog(name: String!): QueryLog
+}
+```
+
+Thanks to [schema stitching](dev.apollodata.com/tools/graphql-tools/schema-stitching.html), it's possible to merge this schema with the remote schema from your Graphcool service:
+
+```js
+const mergedSchema = mergeSchemas({
+  schemas: [graphcoolSchema, localSchema]
+})
+```
+
+A dedicated Apollo Link that hooks into the process of sending a request to the server then is responsible to log the operaion name:
+
+```js
+const addToQueryLogLink = (operation, forward) => {
+
+  const { operationName } = operation
+  const { queryLog } = localStorage
+  const queryLogArray = JSON.parse(queryLog)
+  queryLogArray.push({
+    name: operationName
+  })
+  localStorage.queryLog = JSON.stringify(queryLogArray)
+  return forward(operation).map(result => {
+    console.table(localStorage.queryLog)
+    return result
+  })
+
+}
+```
+
+The `ApolloClient` is instantiated with a the above `addToQueryLogLink` and the `mergedLink` which can respond to queries of the remote and local API (and is also the _terminating_ link in the chain):
+
+```js
+const client = new ApolloClient({
+  link: ApolloLink.from([addToQueryLogLink, mergedLink]),
+  cache: new InMemoryCache()
+})
+```
+
+Thanks to this setup, you can now send queries that ask for data from the remote as well as from the local schema in the same query document:
+
+```graphql
+query AllPostsQuery {
+  allPosts(orderBy: createdAt_DESC) {
+    id
+    imageUrl
+    description
+  }
+  queryLog {
+    entry {
+      name
+    }
+  } 
+}
+```
 
 
-## Help & Community [![Slack Status](https://slack.graph.cool/badge.svg)](https://slack.graph.cool)
 
-Say hello in our [Slack](http://slack.graph.cool/) or visit the [Graphcool Forum](https://www.graph.cool/forum) if you run into issues or have questions. We love talking to you!
 
-![](http://i.imgur.com/5RHR6Ku.png)
+
+
+
+
+
+
+
+
 
 

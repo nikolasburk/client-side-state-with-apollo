@@ -2,6 +2,89 @@
 
 This example is based on the [**React & Apollo**-Quickstart](https://www.graph.cool/docs/quickstart/frontend/react/apollo-tijghei9go/) example from the Graphcool documentation.
 
+
+## Client-side State: Query Logging
+
+This example implements a simple logging mechanism that tracks all the queries that have been made when the application is running and stores them in `localStorage`. All the code for the implementation can be found in [index.js](./src/index.js).
+
+It's based on the following schema representing the client-side state:
+
+```graphql
+schema {
+  query: Query
+  mutation: Mutation
+}
+type Query {
+  queryLog: QueryLog
+}
+type QueryLog {
+  entry: [QueryLogEntry!]!
+}
+type QueryLogEntry {
+  name: String
+}
+type Mutation {
+  appendToLog(name: String!): QueryLog
+}
+```
+
+Thanks to [schema stitching](dev.apollodata.com/tools/graphql-tools/schema-stitching.html), it's possible to merge this schema with the remote schema from your Graphcool service:
+
+```js
+const mergedSchema = mergeSchemas({
+  schemas: [graphcoolSchema, localSchema]
+})
+```
+
+A dedicated Apollo Link that hooks into the process of sending a request to the server then is responsible to log the operaion name:
+
+```js
+const addToQueryLogLink = (operation, forward) => {
+
+  const { operationName } = operation
+  const { queryLog } = localStorage
+  const queryLogArray = JSON.parse(queryLog)
+  queryLogArray.push({
+    name: operationName
+  })
+  localStorage.queryLog = JSON.stringify(queryLogArray)
+  return forward(operation).map(result => {
+    console.table(localStorage.queryLog)
+    return result
+  })
+
+}
+```
+
+The `ApolloClient` is instantiated with a the above `addToQueryLogLink` and the `mergedLink` which can respond to queries of the remote and local API (and is also the _terminating_ link in the chain):
+
+```js
+const client = new ApolloClient({
+  link: ApolloLink.from([addToQueryLogLink, mergedLink]),
+  cache: new InMemoryCache()
+})
+```
+
+Thanks to this setup, you can now send queries that ask for data from the remote as well as from the local schema in the same query document:
+
+```graphql
+query AllPostsQuery {
+  allPosts(orderBy: createdAt_DESC) {
+    id
+    imageUrl
+    description
+  }
+  queryLog {
+    entry {
+      name
+    }
+  } 
+}
+```
+
+
+
+
 ## Get started
 
 ### 1. Clone example repository
@@ -85,87 +168,6 @@ cd ..
 yarn install
 yarn start # open http://localhost:3000 in your browser
 ```
-
-
-## Client-side State: Query Logging
-
-This example implements a simple logging mechanism that tracks all the queries that have been made when the application is running and stores them in `localStorage`. All the code for the implementation can be found in [index.js](./src/index.js).
-
-It's based on the following schema representing the client-side state:
-
-```graphql
-schema {
-  query: Query
-  mutation: Mutation
-}
-type Query {
-  queryLog: QueryLog
-}
-type QueryLog {
-  entry: [QueryLogEntry!]!
-}
-type QueryLogEntry {
-  name: String
-}
-type Mutation {
-  appendToLog(name: String!): QueryLog
-}
-```
-
-Thanks to [schema stitching](dev.apollodata.com/tools/graphql-tools/schema-stitching.html), it's possible to merge this schema with the remote schema from your Graphcool service:
-
-```js
-const mergedSchema = mergeSchemas({
-  schemas: [graphcoolSchema, localSchema]
-})
-```
-
-A dedicated Apollo Link that hooks into the process of sending a request to the server then is responsible to log the operaion name:
-
-```js
-const addToQueryLogLink = (operation, forward) => {
-
-  const { operationName } = operation
-  const { queryLog } = localStorage
-  const queryLogArray = JSON.parse(queryLog)
-  queryLogArray.push({
-    name: operationName
-  })
-  localStorage.queryLog = JSON.stringify(queryLogArray)
-  return forward(operation).map(result => {
-    console.table(localStorage.queryLog)
-    return result
-  })
-
-}
-```
-
-The `ApolloClient` is instantiated with a the above `addToQueryLogLink` and the `mergedLink` which can respond to queries of the remote and local API (and is also the _terminating_ link in the chain):
-
-```js
-const client = new ApolloClient({
-  link: ApolloLink.from([addToQueryLogLink, mergedLink]),
-  cache: new InMemoryCache()
-})
-```
-
-Thanks to this setup, you can now send queries that ask for data from the remote as well as from the local schema in the same query document:
-
-```graphql
-query AllPostsQuery {
-  allPosts(orderBy: createdAt_DESC) {
-    id
-    imageUrl
-    description
-  }
-  queryLog {
-    entry {
-      name
-    }
-  } 
-}
-```
-
 
 
 

@@ -41,7 +41,7 @@ const mergedSchema = mergeSchemas({
 })
 ```
 
-A dedicated Apollo Link that hooks into the process of sending a request to the server then is responsible to log the operaion name:
+A dedicated Apollo Link that hooks into the process of sending a request to the server then is responsible to log the operation name:
 
 ```js
 const addToQueryLogLink = (operation, forward) => {

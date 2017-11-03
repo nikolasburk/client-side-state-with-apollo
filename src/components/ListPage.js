@@ -64,11 +64,11 @@ const ALL_POSTS_QUERY = gql`
       imageUrl
       description
     }
-    queryLog {
-      entry {
-        name
-      }
-    } 
+#    queryLog {
+#      entry {
+#        name
+#      }
+#    } 
   }
 `
 

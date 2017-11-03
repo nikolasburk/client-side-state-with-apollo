@@ -7,7 +7,7 @@ import {BrowserRouter as Router, Route} from 'react-router-dom'
 import { ApolloProvider } from 'react-apollo'
 import { ApolloClient } from 'apollo-client'
 import { HttpLink } from 'apollo-link-http'
-import { Observable } from 'apollo-link'
+import { Observable, ApolloLink } from 'apollo-link'
 import { InMemoryCache } from 'apollo-cache-inmemory'
 import { graphql, print } from 'graphql'
 import { 
@@ -19,11 +19,7 @@ import {
 import 'tachyons'
 import './index.css'
 
-let state = {
- queryLog: [{
-  name: 'asd'
- }]
-}
+localStorage.setItem('queryLog', JSON.stringify([]))
 
 const typeDefs = `
 schema {
@@ -45,20 +41,24 @@ type QueryLogEntry {
 
 type Mutation {
   appendToLog(name: String!): QueryLog
-}`;
+}`
 
 // Provide resolver functions for your schema fields
 const resolvers = {
   Query: {
     queryLog: () => {
-      return state
+      return JSON.parse(localStorage.queryLog)
     }
   },
   Mutation: {
     appendToLog: ({name}) => {
       const logEntry = { name }
-      state.queryLog.push(logEntry)
-      return state
+      const queryLogArray = JSON.parse(localStorage.queryLog)
+
+      queryLogArray.push(logEntry)
+      localStorage.queryLog = JSON.stringify(queryLogArray)
+
+      return JSON.parse(localStorage.queryLog)
     }
   },
   QueryLog: {
@@ -81,6 +81,22 @@ const localSchema = makeExecutableSchema({
 const endpoint = 'https://api.graph.cool/simple/v1/cj9iqxzyv3orw01244c4dpes7'
 const link = new HttpLink({ uri: endpoint, fetch })
 
+const addToQueryLogLink = (operation, forward) => {
+
+  const { operationName } = operation
+  const { queryLog } = localStorage
+  const queryLogArray = JSON.parse(queryLog)
+  queryLogArray.push({
+    name: operationName
+  })
+  localStorage.queryLog = JSON.stringify(queryLogArray)
+  return forward(operation).map(result => {
+    console.table(localStorage.queryLog)
+    return result
+  })
+
+}
+
 introspectSchema(link).then(schema => {
 
   const graphcoolSchema = makeRemoteExecutableSchema({ schema, link })
@@ -91,10 +107,8 @@ introspectSchema(link).then(schema => {
   const mergedLink = operation => {
     return new Observable(observer => {
       const { query, variables, operationName } = operation
-      console.log(`Create for operation: `, operation)
       graphql(mergedSchema, print(query), {}, {}, variables, operationName)
         .then(result => {
-          console.log(`Query result: `, result)
           observer.next(result)
           observer.complete(result)
         })
@@ -103,7 +117,7 @@ introspectSchema(link).then(schema => {
   }
 
   const client = new ApolloClient({
-    link: mergedLink,
+    link: ApolloLink.from([addToQueryLogLink, mergedLink]),
     cache: new InMemoryCache()
   })
 

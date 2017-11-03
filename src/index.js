@@ -43,7 +43,6 @@ type Mutation {
   appendToLog(name: String!): QueryLog
 }`
 
-// Provide resolver functions for your schema fields
 const resolvers = {
   Query: {
     queryLog: () => {
@@ -63,7 +62,7 @@ const resolvers = {
   },
   QueryLog: {
     entry: data => {
-      return data.queryLog
+      return data
     }
   },
   QueryLogEntry: {
@@ -78,7 +77,9 @@ const localSchema = makeExecutableSchema({
   resolvers
 })
 
-const endpoint = 'https://api.graph.cool/simple/v1/cj9iqxzyv3orw01244c4dpes7'
+// replace __SERVICE_ID__ with the ID of your own Graphcool service
+// more info here: https://www.graph.cool/docs/quickstart/frontend/react/apollo-tijghei9go/
+const endpoint = 'https://api.graph.cool/simple/v1/__SERVICE_ID__'
 const link = new HttpLink({ uri: endpoint, fetch })
 
 const addToQueryLogLink = (operation, forward) => {

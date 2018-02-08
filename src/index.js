@@ -92,7 +92,7 @@ const addToQueryLogLink = (operation, forward) => {
   })
   localStorage.queryLog = JSON.stringify(queryLogArray)
   return forward(operation).map(result => {
-    console.table(localStorage.queryLog)
+    console.table(JSON.parse(localStorage.queryLog))
     return result
   })
 
